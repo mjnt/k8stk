@@ -21,3 +21,6 @@ jobs:
 
     - name: Build
       run: go build -v .
+    
+    - name: Confirm output from built executable
+      run: ./k8stk
