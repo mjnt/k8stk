@@ -8,12 +8,11 @@ package cmd
 
 import (
     "fmt"
-    "io/ioutil"
     "strconv"
+    "github.com/mjnt/k8stk/util"
     
     
     "github.com/spf13/cobra"
-    "gopkg.in/yaml.v3"
 )
 
 // mergeCmd represents the merge command
@@ -24,7 +23,7 @@ var mergeCmd = &cobra.Command{
     Args: cobra.MinimumNArgs(2),
     Example: "k8stk merge -o newConfig ~/.kube/config ~/.kube/new_cluster_config",
     Run: func(cmd *cobra.Command, args []string) {
-        doStuff(cmd, args)
+        mergeKubeconfig(cmd, args)
     },
 }
 
@@ -42,59 +41,15 @@ func init() {
     mergeCmd.Flags().StringP("output", "o", "", "File to output the merged config to. If not passed the output will be sent to stdout")
 }
 
-type Config struct {
-    ApiVersion string `yaml:"apiVersion"`
-    Clusters []struct {
-        Cluster struct {
-            CaData string `yaml:"certificate-authority-data"`
-            Server string
-        }
-        Name string
-    }
-    Contexts []struct {
-        Context struct {
-            Cluster string
-            User string
-        }
-        Name string
-    }
-    CurrentContext string `yaml:"current-context"`
-    Kind string
-    Preferences map[string]string
-    Users []struct {
-        Name string
-        User struct {
-            CertData string `yaml:"client-certificate-data"`
-            KeyData string `yaml:"client-key-data"`
-        }
-    }
-}
-
-func parseYaml(filename string) Config {
-    source, err := ioutil.ReadFile(filename)
-
-    if err != nil {
-        panic(err)
-    }
-
-    c := Config{}
-    err = yaml.Unmarshal(source, &c)
-    if err != nil {
-        panic(err)
-    }
-
-    return c
-}
-
-func doStuff(cmd *cobra.Command, args []string) {
-    base := parseYaml(args[0])
+func mergeKubeconfig(cmd *cobra.Command, args []string) {
+    base := util.ParseYaml(args[0])
 
     cluster_nm := 0
     context_nm := 0
     user_nm := 0
 
     for _, file := range args[1:] {
-        tmp := parseYaml(string(file))
+        tmp := util.ParseYaml(string(file))
         namesChanged := make(map[string]string)
 
         for _, cluster := range tmp.Clusters {
@@ -142,18 +97,5 @@ func doStuff(cmd *cobra.Command, args []string) {
         }
     }
 
-    out, _ := yaml.Marshal(&base)
-
-    output_file := cmd.Flags().Lookup("output").Value.String()
-
-    if output_file != "" {
-        fmt.Printf("Writing the output to %s\n", output_file)
-        err := ioutil.WriteFile(output_file, out, 0644)
-
-        if err != nil {
-            panic(err)
-        }
-    } else {
-        fmt.Println(string(out))
-    }
+    util.OutputYaml(base, cmd.Flags().Lookup("output").Value.String())
 }
